@@ -56,6 +56,18 @@ const createFileMutation = `
   }
 `;
 
+const uploadFileMutation = `
+  mutation UploadFile($fileName: String!, $fileData: String!, $fileType: String!) {
+    uploadFile(fileName: $fileName, fileData: $fileData, fileType: $fileType) {
+      secureID
+      fileName
+      uploadedAt
+      status
+      s3Key
+    }
+  }
+`;
+
 const deleteFileMutation = `
   mutation DeleteFile($id: ID!) {
     deleteFile(id: $id) {
@@ -142,7 +154,7 @@ export default function App() {
     setFiles([]);
   }
 
-  async function handleFileUpload(e) {
+ async function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -150,24 +162,20 @@ export default function App() {
     setError('');
 
     try {
-      // Get presigned URL
-      const urlResult = await client.graphql({
-        query: getPresignedUrlMutation,
-        variables: { fileName: file.name }
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
 
-      const { url } = urlResult.data.getPresignedUrl;
-
-     // Upload directly to S3
-      await fetch(url, {
-        method: 'PUT',
-        body: file
-      });
-
-      // Save metadata to DynamoDB
       await client.graphql({
-        query: createFileMutation,
-        variables: { fileName: file.name }
+        query: uploadFileMutation,
+        variables: {
+          fileName: file.name,
+          fileData: base64,
+          fileType: file.type || 'application/octet-stream'
+        }
       });
 
       setSuccess(`${file.name} uploaded successfully!`);
