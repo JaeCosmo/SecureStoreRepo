@@ -1,4 +1,8 @@
 import { Amplify } from 'aws-amplify';
+import React, { useState, useEffect } from 'react';
+import { generateClient } from 'aws-amplify/api';
+import { signIn, signUp, signOut, confirmSignUp, getCurrentUser } from 'aws-amplify/auth';
+import './App.css';
 
 Amplify.configure({
   Auth: {
@@ -16,10 +20,6 @@ Amplify.configure({
     }
   }
 });
-import React, { useState, useEffect } from 'react';
-import { generateClient } from 'aws-amplify/api';
-import { signIn, signUp, signOut, confirmSignUp, getCurrentUser } from 'aws-amplify/auth';
-import './App.css';
 
 const client = generateClient();
 
