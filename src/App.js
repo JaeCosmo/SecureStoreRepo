@@ -1,3 +1,21 @@
+import { Amplify } from 'aws-amplify';
+
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolId: 'us-east-1_dB7LLqLBD',
+      userPoolClientId: 'YOUR_NEW_SPA_CLIENT_ID',
+      region: 'us-east-1'
+    }
+  },
+  API: {
+    GraphQL: {
+      endpoint: 'https://n7sry4lnivbf3kh5wu37a27nbi.appsync-api.us-east-1.amazonaws.com/graphql',
+      region: 'us-east-1',
+      defaultAuthMode: 'userPool'
+    }
+  }
+});
 import React, { useState, useEffect } from 'react';
 import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
