@@ -158,11 +158,10 @@ export default function App() {
 
       const { url } = urlResult.data.getPresignedUrl;
 
-      // Upload directly to S3
+     // Upload directly to S3
       await fetch(url, {
         method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': 'application/octet-stream' }
+        body: file
       });
 
       // Save metadata to DynamoDB
