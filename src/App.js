@@ -4,7 +4,7 @@ Amplify.configure({
   Auth: {
     Cognito: {
       userPoolId: 'us-east-1_dB7LLqLBD',
-      userPoolClientId: 'YOUR_NEW_SPA_CLIENT_ID',
+      userPoolClientId: '5t7s598es2q8e0lipftv356gij',
       region: 'us-east-1'
     }
   },
@@ -17,7 +17,6 @@ Amplify.configure({
   }
 });
 import React, { useState, useEffect } from 'react';
-import { Amplify } from 'aws-amplify';
 import { generateClient } from 'aws-amplify/api';
 import { signIn, signUp, signOut, confirmSignUp, getCurrentUser } from 'aws-amplify/auth';
 import './App.css';
