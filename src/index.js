@@ -6,9 +6,11 @@ import { Amplify } from 'aws-amplify';
 
 Amplify.configure({
   Auth: {
-    region: 'us-east-1',
-    userPoolId: 'us-east-1_dB7LLqLBD',
-    userPoolWebClientId: '63iu7b142rnpi513342cpmoq1d',
+    Cognito: {
+      userPoolId: 'us-east-1_dB7LLqLBD',
+      userPoolClientId: 'YOUR_APP_CLIENT_ID',
+      region: 'us-east-1'
+    }
   },
   API: {
     GraphQL: {
