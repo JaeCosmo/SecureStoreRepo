@@ -265,16 +265,20 @@ export default function App() {
   }
 
   async function loadSharedFiles() {
-    try {
-      const result = await client.graphql({
-        query: getSharedFilesQuery,
-        variables: { email: user.signInDetails?.loginId || '' }
-      });
-      setSharedFiles(result.data.getSharedFiles || []);
-    } catch (err) {
-      setError('Failed to load shared files');
-    }
+  try {
+    const currentUser = await getCurrentUser();
+    const userEmail = currentUser.signInDetails?.loginId 
+      || currentUser.username;
+    
+    const result = await client.graphql({
+      query: getSharedFilesQuery,
+      variables: { email: userEmail }
+    });
+    setSharedFiles(result.data.getSharedFiles || []);
+  } catch (err) {
+    setError('Failed to load shared files: ' + err.message);
   }
+}
 
   async function handleLoadComments(fileId) {
     try {
