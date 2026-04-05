@@ -23,7 +23,6 @@ Amplify.configure({
 
 const client = generateClient();
 
-// GraphQL operations
 const listFilesQuery = `
   query ListFiles {
     listFiles {
@@ -32,26 +31,6 @@ const listFilesQuery = `
       uploadedAt
       status
       s3Key
-    }
-  }
-`;
-
-const getPresignedUrlMutation = `
-  mutation GetPresignedUrl($fileName: String!) {
-    getPresignedUrl(fileName: $fileName) {
-      url
-      s3Key
-    }
-  }
-`;
-
-const createFileMutation = `
-  mutation CreateFile($fileName: String!) {
-    createFile(fileName: $fileName) {
-      secureID
-      fileName
-      uploadedAt
-      status
     }
   }
 `;
@@ -77,6 +56,70 @@ const deleteFileMutation = `
   }
 `;
 
+const shareFileMutation = `
+  mutation ShareFile($fileId: ID!, $email: String!) {
+    shareFile(fileId: $fileId, email: $email) {
+      fileId
+      email
+      fileName
+      sharedAt
+    }
+  }
+`;
+
+const getSharedFilesQuery = `
+  query GetSharedFiles($email: String!) {
+    getSharedFiles(email: $email) {
+      secureID
+      fileName
+      sharedBy
+      sharedAt
+      s3Key
+    }
+  }
+`;
+
+const addCommentMutation = `
+  mutation AddComment($fileId: ID!, $comment: String!) {
+    addComment(fileId: $fileId, comment: $comment) {
+      commentId
+      comment
+      authorID
+      createdAt
+    }
+  }
+`;
+
+const getCommentsQuery = `
+  query GetComments($fileId: ID!) {
+    getComments(fileId: $fileId) {
+      commentId
+      comment
+      authorID
+      createdAt
+    }
+  }
+`;
+
+const getDownloadUrlQuery = `
+  query GetDownloadUrl($fileId: ID!) {
+    getDownloadUrl(fileId: $fileId) {
+      url
+      fileName
+    }
+  }
+`;
+
+const generateShareLinkMutation = `
+  mutation GenerateShareLink($fileId: ID!) {
+    generateShareLink(fileId: $fileId) {
+      url
+      fileName
+      expiresIn
+    }
+  }
+`;
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [authMode, setAuthMode] = useState('signin');
@@ -88,6 +131,14 @@ export default function App() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [shareEmail, setShareEmail] = useState('');
+  const [sharingFileId, setSharingFileId] = useState(null);
+  const [sharedFiles, setSharedFiles] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [shareLink, setShareLink] = useState('');
+  const [activeTab, setActiveTab] = useState('myFiles');
 
   useEffect(() => {
     checkUser();
@@ -154,13 +205,11 @@ export default function App() {
     setFiles([]);
   }
 
- async function handleFileUpload(e) {
+  async function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
-
     setUploading(true);
     setError('');
-
     try {
       const base64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -168,7 +217,6 @@ export default function App() {
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
-
       await client.graphql({
         query: uploadFileMutation,
         variables: {
@@ -177,7 +225,6 @@ export default function App() {
           fileType: file.type || 'application/octet-stream'
         }
       });
-
       setSuccess(`${file.name} uploaded successfully!`);
       loadFiles();
     } catch (err) {
@@ -201,17 +248,135 @@ export default function App() {
     }
   }
 
-  // Auth UI
+  async function handleShare(fileId) {
+    if (!shareEmail) return;
+    try {
+      setError('');
+      await client.graphql({
+        query: shareFileMutation,
+        variables: { fileId, email: shareEmail }
+      });
+      setSuccess(`File shared with ${shareEmail} successfully!`);
+      setShareEmail('');
+      setSharingFileId(null);
+    } catch (err) {
+      setError('Share failed: ' + err.message);
+    }
+  }
+
+  async function loadSharedFiles() {
+    try {
+      const result = await client.graphql({
+        query: getSharedFilesQuery,
+        variables: { email: user.signInDetails?.loginId || '' }
+      });
+      setSharedFiles(result.data.getSharedFiles || []);
+    } catch (err) {
+      setError('Failed to load shared files');
+    }
+  }
+
+  async function handleLoadComments(fileId) {
+    try {
+      setSelectedFile(fileId);
+      const result = await client.graphql({
+        query: getCommentsQuery,
+        variables: { fileId }
+      });
+      setComments(result.data.getComments || []);
+    } catch (err) {
+      setError('Failed to load comments');
+    }
+  }
+
+  async function handleAddComment(fileId) {
+    if (!commentText) return;
+    try {
+      await client.graphql({
+        query: addCommentMutation,
+        variables: { fileId, comment: commentText }
+      });
+      setCommentText('');
+      handleLoadComments(fileId);
+      setSuccess('Comment added!');
+    } catch (err) {
+      setError('Failed to add comment');
+    }
+  }
+
+  async function handleDownload(fileId) {
+    try {
+      const result = await client.graphql({
+        query: getDownloadUrlQuery,
+        variables: { fileId }
+      });
+      const { url, fileName } = result.data.getDownloadUrl;
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      link.click();
+    } catch (err) {
+      setError('Download failed: ' + err.message);
+    }
+  }
+
+  async function handleGenerateShareLink(fileId) {
+    try {
+      const result = await client.graphql({
+        query: generateShareLinkMutation,
+        variables: { fileId }
+      });
+      setShareLink(result.data.generateShareLink.url);
+      setSuccess('Share link generated! Valid for 24 hours.');
+    } catch (err) {
+      setError('Failed to generate share link: ' + err.message);
+    }
+  }
+
+  const styles = {
+    container: { maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif' },
+    authBox: { maxWidth: '400px', margin: '100px auto', padding: '40px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', borderRadius: '8px' },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
+    title: { color: '#232f3e' },
+    subtitle: { color: '#666', marginBottom: '20px' },
+    input: { width: '100%', padding: '10px', marginBottom: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' },
+    button: { width: '100%', padding: '10px', background: '#ff9900', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' },
+    signOutButton: { padding: '8px 16px', background: '#232f3e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+    deleteButton: { padding: '6px 12px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+    error: { background: '#fde8e8', color: '#c0392b', padding: '10px', borderRadius: '4px', marginBottom: '10px' },
+    success: { background: '#e8f8e8', color: '#27ae60', padding: '10px', borderRadius: '4px', marginBottom: '10px' },
+    uploadBox: { background: '#f9f9f9', padding: '20px', borderRadius: '8px', marginBottom: '20px' },
+    filesBox: { background: '#f9f9f9', padding: '20px', borderRadius: '8px' },
+    fileItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '10px', background: 'white', borderRadius: '4px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+    fileDate: { color: '#666', fontSize: '12px', margin: '4px 0 0 0' },
+    toggle: { textAlign: 'center', marginTop: '10px' },
+    link: { color: '#ff9900', cursor: 'pointer', textDecoration: 'underline' },
+    tabs: { display: 'flex', marginBottom: '20px', gap: '10px' },
+    tab: { padding: '10px 20px', background: '#f0f0f0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' },
+    activeTab: { padding: '10px 20px', background: '#232f3e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' },
+    fileActions: { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' },
+    actionButton: { padding: '6px 12px', background: '#ff9900', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+    shareRow: { display: 'flex', gap: '8px', marginTop: '8px', alignItems: 'center' },
+    shareInput: { flex: 1, padding: '6px', border: '1px solid #ddd', borderRadius: '4px' },
+    shareButton: { padding: '6px 12px', background: '#27ae60', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+    cancelButton: { padding: '6px 12px', background: '#95a5a6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+    commentsBox: { marginTop: '10px', padding: '10px', background: '#f9f9f9', borderRadius: '4px' },
+    comment: { padding: '6px 0', borderBottom: '1px solid #eee' },
+    commentText: { margin: '0 0 4px 0' },
+    commentDate: { margin: 0, fontSize: '11px', color: '#999' },
+    shareLinkBox: { background: '#fff3cd', padding: '12px', borderRadius: '4px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' },
+    shareLinkInput: { flex: 1, padding: '6px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '200px' },
+    copyButton: { padding: '6px 12px', background: '#3498db', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+  };
+
   if (!user) {
     return (
       <div style={styles.container}>
         <div style={styles.authBox}>
           <h1 style={styles.title}>SecureStore</h1>
           <p style={styles.subtitle}>Secure file storage platform</p>
-
           {error && <div style={styles.error}>{error}</div>}
           {success && <div style={styles.success}>{success}</div>}
-
           {needsConfirmation ? (
             <>
               <p>Enter the confirmation code sent to {email}</p>
@@ -225,7 +390,6 @@ export default function App() {
                 value={email} onChange={e => setEmail(e.target.value)} />
               <input style={styles.input} placeholder="Password" type="password"
                 value={password} onChange={e => setPassword(e.target.value)} />
-
               {authMode === 'signin' ? (
                 <>
                   <button style={styles.button} onClick={handleSignIn}>Sign In</button>
@@ -250,7 +414,6 @@ export default function App() {
     );
   }
 
-  // Main app UI
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -261,53 +424,145 @@ export default function App() {
       {error && <div style={styles.error}>{error}</div>}
       {success && <div style={styles.success}>{success}</div>}
 
-      <div style={styles.uploadBox}>
-        <h2>Upload File</h2>
-        <input type="file" onChange={handleFileUpload} disabled={uploading} />
-        {uploading && <p>Uploading...</p>}
+      {shareLink && (
+        <div style={styles.shareLinkBox}>
+          <strong>Share Link (expires in 24 hours):</strong>
+          <input style={styles.shareLinkInput} value={shareLink} readOnly
+            onClick={e => e.target.select()} />
+          <button style={styles.copyButton}
+            onClick={() => { navigator.clipboard.writeText(shareLink); setSuccess('Link copied!'); }}>
+            Copy
+          </button>
+        </div>
+      )}
+
+      <div style={styles.tabs}>
+        <button style={activeTab === 'myFiles' ? styles.activeTab : styles.tab}
+          onClick={() => { setActiveTab('myFiles'); loadFiles(); }}>
+          My Files
+        </button>
+        <button style={activeTab === 'sharedWithMe' ? styles.activeTab : styles.tab}
+          onClick={() => { setActiveTab('sharedWithMe'); loadSharedFiles(); }}>
+          Shared With Me
+        </button>
       </div>
 
-      <div style={styles.filesBox}>
-        <h2>Your Files</h2>
-        {files.length === 0 ? (
-          <p>No files uploaded yet.</p>
-        ) : (
-          files.map(file => (
-            <div key={file.secureID} style={styles.fileItem}>
-              <div>
-                <strong>{file.fileName}</strong>
-                <p style={styles.fileDate}>
-                  {new Date(file.uploadedAt).toLocaleString()}
-                </p>
+      {activeTab === 'myFiles' && (
+        <>
+          <div style={styles.uploadBox}>
+            <h2>Upload File</h2>
+            <input type="file" onChange={handleFileUpload} disabled={uploading} />
+            {uploading && <p>Uploading...</p>}
+          </div>
+
+          <div style={styles.filesBox}>
+            <h2>Your Files</h2>
+            {files.length === 0 ? (
+              <p>No files uploaded yet.</p>
+            ) : (
+              files.map(file => (
+                <div key={file.secureID} style={styles.fileItem}>
+                  <div style={{flex: 1}}>
+                    <strong>{file.fileName}</strong>
+                    <p style={styles.fileDate}>
+                      {new Date(file.uploadedAt).toLocaleString()}
+                    </p>
+                    {sharingFileId === file.secureID && (
+                      <div style={styles.shareRow}>
+                        <input style={styles.shareInput}
+                          placeholder="Enter email to share with"
+                          value={shareEmail}
+                          onChange={e => setShareEmail(e.target.value)} />
+                        <button style={styles.shareButton}
+                          onClick={() => handleShare(file.secureID)}>
+                          Share
+                        </button>
+                        <button style={styles.cancelButton}
+                          onClick={() => setSharingFileId(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                    {selectedFile === file.secureID && (
+                      <div style={styles.commentsBox}>
+                        <strong>Comments:</strong>
+                        {comments.length === 0 ? <p>No comments yet.</p> : (
+                          comments.map(c => (
+                            <div key={c.commentId} style={styles.comment}>
+                              <p style={styles.commentText}>{c.comment}</p>
+                              <p style={styles.commentDate}>
+                                {new Date(c.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                        <div style={styles.shareRow}>
+                          <input style={styles.shareInput}
+                            placeholder="Add a comment..."
+                            value={commentText}
+                            onChange={e => setCommentText(e.target.value)} />
+                          <button style={styles.shareButton}
+                            onClick={() => handleAddComment(file.secureID)}>
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={styles.fileActions}>
+                    <button style={styles.actionButton}
+                      onClick={() => handleDownload(file.secureID)}>
+                      Download
+                    </button>
+                    <button style={styles.actionButton}
+                      onClick={() => setSharingFileId(file.secureID)}>
+                      Share
+                    </button>
+                    <button style={styles.actionButton}
+                      onClick={() => handleGenerateShareLink(file.secureID)}>
+                      Link
+                    </button>
+                    <button style={styles.actionButton}
+                      onClick={() => selectedFile === file.secureID
+                        ? setSelectedFile(null)
+                        : handleLoadComments(file.secureID)}>
+                      Comments
+                    </button>
+                    <button style={styles.deleteButton}
+                      onClick={() => handleDelete(file.secureID)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+
+      {activeTab === 'sharedWithMe' && (
+        <div style={styles.filesBox}>
+          <h2>Shared With Me</h2>
+          {sharedFiles.length === 0 ? (
+            <p>No files shared with you yet.</p>
+          ) : (
+            sharedFiles.map(file => (
+              <div key={file.SecureSort} style={styles.fileItem}>
+                <div style={{flex: 1}}>
+                  <strong>{file.fileName}</strong>
+                  <p style={styles.fileDate}>
+                    Shared by {file.sharedBy} on {new Date(file.sharedAt).toLocaleString()}
+                  </p>
+                </div>
+                <button style={styles.actionButton}
+                  onClick={() => handleDownload(file.secureID)}>
+                  Download
+                </button>
               </div>
-              <button style={styles.deleteButton}
-                onClick={() => handleDelete(file.secureID)}>
-                Delete
-              </button>
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
-const styles = {
-  container: { maxWidth: '800px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif' },
-  authBox: { maxWidth: '400px', margin: '100px auto', padding: '40px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', borderRadius: '8px' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
-  title: { color: '#232f3e' },
-  subtitle: { color: '#666', marginBottom: '20px' },
-  input: { width: '100%', padding: '10px', marginBottom: '10px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' },
-  button: { width: '100%', padding: '10px', background: '#ff9900', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' },
-  signOutButton: { padding: '8px 16px', background: '#232f3e', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
-  deleteButton: { padding: '6px 12px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
-  error: { background: '#fde8e8', color: '#c0392b', padding: '10px', borderRadius: '4px', marginBottom: '10px' },
-  success: { background: '#e8f8e8', color: '#27ae60', padding: '10px', borderRadius: '4px', marginBottom: '10px' },
-  uploadBox: { background: '#f9f9f9', padding: '20px', borderRadius: '8px', marginBottom: '20px' },
-  filesBox: { background: '#f9f9f9', padding: '20px', borderRadius: '8px' },
-  fileItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'white', borderRadius: '4px', marginBottom: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
-  fileDate: { color: '#666', fontSize: '12px', margin: '4px 0 0 0' },
-  toggle: { textAlign: 'center', marginTop: '10px' },
-  link: { color: '#ff9900', cursor: 'pointer', textDecoration: 'underline' }
-};
