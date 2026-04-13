@@ -550,20 +550,53 @@ export default function App() {
           {sharedFiles.length === 0 ? (
             <p>No files shared with you yet.</p>
           ) : (
-            sharedFiles.map(file => (
-              <div key={file.SecureSort} style={styles.fileItem}>
-                <div style={{flex: 1}}>
-                  <strong>{file.fileName}</strong>
-                  <p style={styles.fileDate}>
-                    Shared by {file.sharedBy} on {new Date(file.sharedAt).toLocaleString()}
-                  </p>
-                </div>
-                <button style={styles.actionButton}
-                  onClick={() => handleDownload(file.secureID)}>
-                  Download
-                </button>
+sharedFiles.map(file => (
+  <div key={file.SecureSort} style={styles.fileItem}>
+    <div style={{flex: 1}}>
+      <strong>{file.fileName}</strong>
+      <p style={styles.fileDate}>
+        Shared by {file.sharedBy} on {new Date(file.sharedAt).toLocaleString()}
+      </p>
+      {selectedFile === file.secureID && (
+        <div style={styles.commentsBox}>
+          <strong>Comments:</strong>
+          {comments.length === 0 ? <p>No comments yet.</p> : (
+            comments.map(c => (
+              <div key={c.commentId} style={styles.comment}>
+                <p style={styles.commentText}>{c.comment}</p>
+                <p style={styles.commentDate}>
+                  {new Date(c.createdAt).toLocaleString()}
+                </p>
               </div>
             ))
+          )}
+          <div style={styles.shareRow}>
+            <input style={styles.shareInput}
+              placeholder="Add a comment..."
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)} />
+            <button style={styles.shareButton}
+              onClick={() => handleAddComment(file.secureID)}>
+              Add
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+    <div style={styles.fileActions}>
+      <button style={styles.actionButton}
+        onClick={() => handleDownload(file.secureID)}>
+        Download
+      </button>
+      <button style={styles.actionButton}
+        onClick={() => selectedFile === file.secureID
+          ? setSelectedFile(null)
+          : handleLoadComments(file.secureID)}>
+        Comments
+      </button>
+    </div>
+  </div>
+))
           )}
         </div>
       )}
