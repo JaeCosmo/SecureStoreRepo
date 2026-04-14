@@ -148,6 +148,16 @@ export default function App() {
     checkUser();
   }, []);
 
+  useEffect(() => {
+  if (success || error) {
+    const timer = setTimeout(() => {
+      setSuccess('');
+      setError('');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }
+}, [success, error]);
+
   async function checkUser() {
     try {
       const currentUser = await getCurrentUser();
