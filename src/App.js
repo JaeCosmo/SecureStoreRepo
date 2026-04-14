@@ -1,7 +1,8 @@
 import { Amplify } from 'aws-amplify';
 import React, { useState, useEffect } from 'react';
 import { generateClient } from 'aws-amplify/api';
-import { signIn, signUp, signOut, confirmSignUp, getCurrentUser } from 'aws-amplify/auth';
+import { signIn, signUp, signOut, confirmSignUp, getCurrentUser,
+  resetPassword, confirmResetPassword } from 'aws-amplify/auth';
 import './App.css';
 
 Amplify.configure({
@@ -139,6 +140,9 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [shareLink, setShareLink] = useState('');
   const [activeTab, setActiveTab] = useState('myFiles');
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
   useEffect(() => {
     checkUser();
@@ -203,6 +207,33 @@ export default function App() {
     await signOut();
     setUser(null);
     setFiles([]);
+  }
+
+   async function handleForgotPassword() {
+    try {
+      setError('');
+      await resetPassword({ username: email });
+      setForgotPasswordMode('confirm');
+      setSuccess('Reset code sent to your email!');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleConfirmResetPassword() {
+    try {
+      setError('');
+      await confirmResetPassword({
+        username: email,
+        confirmationCode: resetCode,
+        newPassword
+      });
+      setSuccess('Password reset! Please sign in.');
+      setForgotPasswordMode(false);
+      setAuthMode('signin');
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function handleFileUpload(e) {
@@ -394,23 +425,58 @@ export default function App() {
                 value={email} onChange={e => setEmail(e.target.value)} />
               <input style={styles.input} placeholder="Password" type="password"
                 value={password} onChange={e => setPassword(e.target.value)} />
-              {authMode === 'signin' ? (
-                <>
-                  <button style={styles.button} onClick={handleSignIn}>Sign In</button>
-                  <p style={styles.toggle}>
-                    Don't have an account?{' '}
-                    <span style={styles.link} onClick={() => setAuthMode('signup')}>Sign Up</span>
-                  </p>
-                </>
-              ) : (
-                <>
-                  <button style={styles.button} onClick={handleSignUp}>Sign Up</button>
-                  <p style={styles.toggle}>
-                    Already have an account?{' '}
-                    <span style={styles.link} onClick={() => setAuthMode('signin')}>Sign In</span>
-                  </p>
-                </>
-              )}
+             {authMode === 'signin' ? (
+  <>
+    {!forgotPasswordMode ? (
+      <>
+        <button style={styles.button} onClick={handleSignIn}>Sign In</button>
+        <p style={styles.toggle}>
+          <span style={styles.link} onClick={() => setForgotPasswordMode('request')}>
+            Forgot password?
+          </span>
+        </p>
+      </>
+    ) : forgotPasswordMode === 'request' ? (
+      <>
+        <button style={styles.button} onClick={handleForgotPassword}>
+          Send Reset Code
+        </button>
+        <p style={styles.toggle}>
+          <span style={styles.link} onClick={() => setForgotPasswordMode(false)}>
+            Back to sign in
+          </span>
+        </p>
+      </>
+    ) : (
+      <>
+        <input style={styles.input} placeholder="Reset code"
+          value={resetCode} onChange={e => setResetCode(e.target.value)} />
+        <input style={styles.input} placeholder="New password" type="password"
+          value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+        <button style={styles.button} onClick={handleConfirmResetPassword}>
+          Reset Password
+        </button>
+        <p style={styles.toggle}>
+          <span style={styles.link} onClick={() => setForgotPasswordMode(false)}>
+            Back to sign in
+          </span>
+        </p>
+      </>
+    )}
+    <p style={styles.toggle}>
+      Don't have an account?{' '}
+      <span style={styles.link} onClick={() => setAuthMode('signup')}>Sign Up</span>
+    </p>
+  </>
+) : (
+  <>
+    <button style={styles.button} onClick={handleSignUp}>Sign Up</button>
+    <p style={styles.toggle}>
+      Already have an account?{' '}
+      <span style={styles.link} onClick={() => setAuthMode('signin')}>Sign In</span>
+    </p>
+  </>
+)}
             </>
           )}
         </div>
@@ -533,9 +599,13 @@ export default function App() {
                       Comments
                     </button>
                     <button style={styles.deleteButton}
-                      onClick={() => handleDelete(file.secureID)}>
-                      Delete
-                    </button>
+  onClick={() => {
+    if (window.confirm('Are you sure you want to delete this file?')) {
+      handleDelete(file.secureID);
+    }
+  }}>
+  Delete
+</button>
                   </div>
                 </div>
               ))
