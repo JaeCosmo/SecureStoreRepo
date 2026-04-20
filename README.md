@@ -6,7 +6,7 @@
 ![Version](https://img.shields.io/badge/Version-1.0-navy?style=for-the-badge)
 ![AWS](https://img.shields.io/badge/Built%20on-AWS-orange?style=for-the-badge&logo=amazonaws)
 
-SecureStore is a fully serverless file sharing and collaboration platform built on Amazon Web Services (AWS). It allows authenticated users to upload, download, share, and comment on files. All data is encrypted at rest and all access is controlled via Cognito-issued JWT tokens. The platform is designed to be cost-efficient, scalable, and secure — leveraging AWS free tier services where possible, with costs scaling only as usage grows.
+SecureStore is a fully serverless file sharing and collaboration platform built on Amazon Web Services (AWS). It allows authenticated users to upload, download, share, and comment on files. All data is encrypted at rest and all access is controlled via Cognito-issued JWT tokens. The platform is designed to be cost-efficient, scalable, and secure, leveraging AWS free tier services where possible, with costs scaling only as usage grows.
 
 ---
 
